@@ -123,7 +123,12 @@ impl Allocation {
     }
 
     fn validate(&self) -> bool {
-        if self.size == 0 || self.suballocation_list.is_empty(&self.key) {
+        if self.size == 0 {
+            eprintln!("Allocation empty");
+            return false;
+        }
+        if self.suballocation_list.is_empty(&self.key) {
+            eprintln!("Suballocation list empty");
             return false;
         }
         let mut calculated_offset = 0;
@@ -131,13 +136,15 @@ impl Allocation {
         let mut calculated_sum_free_size = 0;
         let mut free_suballocations_to_register = 0;
         let mut prev_free = false;
-        for suballocation_item in self.suballocation_list.iter(&self.key) {
+        for (i, suballocation_item) in self.suballocation_list.iter(&self.key).enumerate() {
             let valid = suballocation_item.with_value(&self.key, |sub_alloc| {
                 if sub_alloc.offset != calculated_offset {
+                    eprintln!("Offset mismatch at suballocation {} - expected {}, got {}", i, calculated_offset, sub_alloc.offset);
                     return false;
                 }
                 let current_is_free = sub_alloc.type_ == SuballocationType::Free;
                 if prev_free && current_is_free {
+                    eprintln!("Two free suballocations in a row: {} and {}", i - 1, i);
                     return false;
                 }
                 prev_free = current_is_free;
@@ -157,16 +164,19 @@ impl Allocation {
             }
         }
         if self.free_suballocations_by_size.len() != free_suballocations_to_register {
+            eprintln!("Free suballocation count mismatch - expected {}, got {}", free_suballocations_to_register, self.free_suballocations_by_size.len());
             return false;
         }
 
         let mut last_size = 0;
-        for free_suballoc in &self.free_suballocations_by_size {
+        for (i, free_suballoc) in self.free_suballocations_by_size.iter().enumerate() {
             let valid = free_suballoc.with_value(&self.key, |sub_alloc| {
                 if sub_alloc.type_ != SuballocationType::Free {
+                    eprintln!("Free suballocation {} is not actually free", i);
                     return false;
                 }
                 if sub_alloc.size < last_size {
+                    eprintln!("Free suballocation {} is not in order - expected at most {} size, got {}", i, last_size, sub_alloc.size);
                     return false;
                 }
                 last_size = sub_alloc.size;
