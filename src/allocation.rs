@@ -258,10 +258,9 @@ impl Allocation {
             }
 
             if buffer_image_granularity > 1 {
-                let mut next_suballoc_item = free_item.clone().next(&self.key).unwrap();
-                let tail = self.suballocation_list.tail(&self.key).unwrap();
-                while !next_suballoc_item.is(&tail) {
-                    match next_suballoc_item.with_value(&self.key, |next_suballoc| {
+                let mut next_suballoc_item = free_item.clone().next(&self.key);
+                while let Some(item) = next_suballoc_item {
+                    match item.with_value(&self.key, |next_suballoc| {
                         if blocks_on_same_page(
                             offset,
                             alloc_size,
@@ -284,7 +283,7 @@ impl Allocation {
                     }) {
                         Some(false) => return None,
                         Some(true) => break,
-                        _ => next_suballoc_item = next_suballoc_item.next(&self.key).unwrap(),
+                        _ => next_suballoc_item = item.next(&self.key),
                     }
                 }
             }
@@ -387,21 +386,28 @@ impl Allocation {
         suballoc_type: SuballocationType,
         alloc_size: u64,
     ) {
-        let mut suballoc = request.free_suballocation_item.with_value(
+        let (padding_begin, padding_end) = request.free_suballocation_item.with_value(
             &self.key,
-            |suballoc| suballoc.clone(),
+            |suballoc| {
+                assert_eq!(suballoc.type_, SuballocationType::Free);
+                assert!(request.offset >= suballoc.offset);
+                let padding_begin = request.offset - suballoc.offset;
+                assert!(suballoc.size >= padding_begin + alloc_size);
+                let padding_end = suballoc.size - padding_begin - alloc_size;
+                (padding_begin, padding_end)
+            }
         );
-        assert_eq!(suballoc.type_, SuballocationType::Free);
-        assert!(request.offset >= suballoc.offset);
-        let padding_begin = request.offset - suballoc.offset;
-        assert!(suballoc.size >= padding_begin + alloc_size);
-        let padding_end = suballoc.size - padding_begin - alloc_size;
 
         self.unregister_free_suballocation(&request.free_suballocation_item);
 
-        suballoc.offset = request.offset;
-        suballoc.size = alloc_size;
-        suballoc.type_ = suballoc_type;
+        request.free_suballocation_item.with_value_mut(
+            &self.key,
+            |suballoc| {
+                suballoc.offset = request.offset;
+                suballoc.size = alloc_size;
+                suballoc.type_ = suballoc_type;
+            }
+        );
 
         if padding_end > 0 {
             let padding_suballoc = Suballocation {
