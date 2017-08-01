@@ -359,8 +359,14 @@ impl Allocation {
         });
         if size >= MIN_FREE_SUBALLOCATION_SIZE_TO_REGISTER {
             let index = self.free_suballocations_by_size
-                .binary_search_by(|a| a.with_value(&self.key, |alloc| alloc.size.cmp(&size)))
-                .unwrap_or_else(|e| e);
+                .binary_search_by(|a| a.with_value(&self.key, |alloc| {
+                    use ::std::cmp::Ordering;
+                    if alloc.size < size {
+                        Ordering::Less
+                    } else {
+                        Ordering::Greater
+                    }
+                })).unwrap_err();
             for i in index..self.free_suballocations_by_size.len() {
                 if self.free_suballocations_by_size[i].is(item) {
                     self.free_suballocations_by_size.remove(i);
@@ -454,6 +460,7 @@ impl Allocation {
         let next_suballoc = next_item.with_value(&self.key, |suballoc| suballoc.clone());
         assert_eq!(next_suballoc.type_, SuballocationType::Free);
         item.with_value_mut(&self.key, |suballoc| suballoc.size += next_suballoc.size);
+        self.free_count -= 1;
         self.suballocation_list.remove(&self.key, &next_item);
     }
 
@@ -482,7 +489,7 @@ impl Allocation {
 
         if let Some(next_item) = free_next {
             self.unregister_free_suballocation(&next_item);
-            self.merge_free_with_next(next_item);
+            self.merge_free_with_next(item.clone());
         }
 
         if let Some(prev_item) = free_prev {

@@ -119,17 +119,18 @@ impl<T> List<T> {
     ) -> Arc<ListItem<T>> {
         self.len += 1;
         let current_next = item.next(key);
-        let new_tail = current_next.is_none();
         let new_item = ListItem::new(
             key.id(),
             ListItemInner {
                 prev: Some(Arc::downgrade(&item)),
-                next: current_next,
+                next: current_next.clone(),
                 value: value,
             },
         );
         item.set_next(key, Some(new_item.clone()));
-        if new_tail {
+        if let Some(current_next) = current_next {
+            current_next.set_prev(key, Some(Arc::downgrade(&new_item)));
+        } else {
             *self.tail.get(key).unwrap().borrow_mut() = Some(new_item.clone());
         }
         new_item
@@ -143,17 +144,18 @@ impl<T> List<T> {
     ) -> Arc<ListItem<T>> {
         self.len += 1;
         let current_prev = item.prev(key);
-        let new_head = current_prev.is_none();
         let new_item = ListItem::new(
             key.id(),
             ListItemInner {
-                prev: current_prev,
+                prev: current_prev.clone(),
                 next: Some(item.clone()),
                 value: value,
             },
         );
         item.set_prev(key, Some(Arc::downgrade(&new_item)));
-        if new_head {
+        if let Some(current_prev) = current_prev {
+            current_prev.upgrade().unwrap().set_next(key, Some(new_item.clone()));
+        } else {
             *self.head.get(key).unwrap().borrow_mut() = Some(new_item.clone());
         }
         new_item
