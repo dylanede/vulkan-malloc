@@ -191,23 +191,23 @@ impl Allocator {
         match reqs.usage {
             MemoryUsage::Unknown => {}
             MemoryUsage::GpuOnly => {
-                preferred_flags.insert(dacite::core::MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+                preferred_flags.insert(dacite::core::MemoryPropertyFlags::DEVICE_LOCAL)
             }
             MemoryUsage::CpuOnly => {
                 required_flags.insert(
-                    dacite::core::MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                        dacite::core::MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                    dacite::core::MemoryPropertyFlags::HOST_VISIBLE |
+                        dacite::core::MemoryPropertyFlags::HOST_COHERENT,
                 )
             }
             MemoryUsage::CpuToGpu => {
-                required_flags.insert(dacite::core::MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-                preferred_flags.insert(dacite::core::MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                required_flags.insert(dacite::core::MemoryPropertyFlags::HOST_VISIBLE);
+                preferred_flags.insert(dacite::core::MemoryPropertyFlags::DEVICE_LOCAL);
             }
             MemoryUsage::GpuToCpu => {
-                required_flags.insert(dacite::core::MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+                required_flags.insert(dacite::core::MemoryPropertyFlags::HOST_VISIBLE);
                 preferred_flags.insert(
-                    dacite::core::MEMORY_PROPERTY_HOST_COHERENT_BIT |
-                        dacite::core::MEMORY_PROPERTY_HOST_CACHED_BIT,
+                    dacite::core::MemoryPropertyFlags::HOST_COHERENT |
+                        dacite::core::MemoryPropertyFlags::HOST_CACHED,
                 );
             }
         }
