@@ -4,7 +4,7 @@
 
 ```toml
 [dependencies]
-vulkan-malloc = "0.1.4"
+vulkan-malloc = "0.1.5"
 ```
 
 This crate provides an implementation of a general purpose device memory allocator that should
